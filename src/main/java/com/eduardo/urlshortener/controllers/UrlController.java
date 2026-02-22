@@ -10,7 +10,6 @@ import java.net.URI;
 import java.util.Map;
 
 @RestController
-@RequestMapping(value = "/urls")
 @RequiredArgsConstructor
 public class UrlController {
 
@@ -27,7 +26,7 @@ public class UrlController {
         return ResponseEntity.ok(Map.of("shortUrl", fullShortUrl));
     }
 
-    @GetMapping
+    @GetMapping("/{shortUrl}")
     public ResponseEntity<Void> redirect(@PathVariable String shortUrl) {
         String originalUrl = service.getOriginalUrl(shortUrl);
 

@@ -5,37 +5,31 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class SnowflakeIdGenerator {
-    private static final long CUSTOM_EPOCH = 1704067200000L;
-    private static final long DATACENTER_ID_BITS = 5L;
-    private static final long MACHINE_ID_BITS = 5L;
-    private static final long SEQUENCE_BITS = 12L;
+    // Época customizada em SEGUNDOS (Ex: 1 de Janeiro de 2024)
+    private static final long CUSTOM_EPOCH = 1704067200L;
 
-    private static final long MAX_DATACENTER_ID = ~(-1L << DATACENTER_ID_BITS);
+    // Configuração para 41 bits totais:
+    // 31 bits para tempo (dura ~68 anos)
+    // 2 bits para máquina (permite até 4 servidores rodando juntos)
+    // 8 bits para sequência (permite até 256 URLs encurtadas por segundo por servidor)
+    private static final long MACHINE_ID_BITS = 2L;
+    private static final long SEQUENCE_BITS = 8L;
+
     private static final long MAX_MACHINE_ID = ~(-1L << MACHINE_ID_BITS);
     private static final long MAX_SEQUENCE = ~(-1L << SEQUENCE_BITS);
 
     private static final long MACHINE_ID_SHIFT = SEQUENCE_BITS;
-    private static final long DATACENTER_ID_SHIFT = SEQUENCE_BITS + MACHINE_ID_BITS;
-    private static final long TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + MACHINE_ID_BITS + DATACENTER_ID_BITS;
+    private static final long TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + MACHINE_ID_BITS;
 
-    private final long datacenterId;
     private final long machineId;
 
     private long sequence = 0L;
     private long lastTimestamp = -1L;
 
-    public SnowflakeIdGenerator(
-            @Value("${snowflake.datacenter.id:1}") long datacenterId,
-            @Value("${snowflake.machine.id:1}") long machineId) {
-
-        this.datacenterId = datacenterId;
+    public SnowflakeIdGenerator(@Value("${snowflake.machine.id:1}") long machineId) {
         this.machineId = machineId;
-
-        if (this.datacenterId > MAX_DATACENTER_ID || this.datacenterId < 0) {
-            throw new IllegalArgumentException("Datacenter ID inválido");
-        }
         if (this.machineId > MAX_MACHINE_ID || this.machineId < 0) {
-            throw new IllegalArgumentException("Machine ID inválido");
+            throw new IllegalArgumentException("Machine ID deve ser entre 0 e " + MAX_MACHINE_ID);
         }
     }
 
@@ -43,14 +37,14 @@ public class SnowflakeIdGenerator {
         long currentTimestamp = timestamp();
 
         if (currentTimestamp < lastTimestamp) {
-            throw new IllegalStateException("O relógio do sistema recuou. Recusando a gerar ID.");
+            throw new IllegalStateException("Relógio recuou.");
         }
 
         if (currentTimestamp == lastTimestamp) {
             sequence = (sequence + 1) & MAX_SEQUENCE;
-
             if (sequence == 0) {
-                currentTimestamp = waitNextMillis(currentTimestamp);
+                // Se esgotar as 256 requisições num único segundo, espera o próximo segundo
+                currentTimestamp = waitNextSecond(currentTimestamp);
             }
         } else {
             sequence = 0L;
@@ -58,17 +52,18 @@ public class SnowflakeIdGenerator {
 
         lastTimestamp = currentTimestamp;
 
+        // Gera o ID compactado em no máximo 41 bits
         return ((currentTimestamp - CUSTOM_EPOCH) << TIMESTAMP_LEFT_SHIFT)
-                | (datacenterId << DATACENTER_ID_SHIFT)
                 | (machineId << MACHINE_ID_SHIFT)
                 | sequence;
     }
 
+    // Agora trabalha em Segundos em vez de Milissegundos
     private long timestamp() {
-        return System.currentTimeMillis();
+        return System.currentTimeMillis() / 1000;
     }
 
-    private long waitNextMillis(long currentTimestamp) {
+    private long waitNextSecond(long currentTimestamp) {
         while (currentTimestamp <= lastTimestamp) {
             currentTimestamp = timestamp();
         }
