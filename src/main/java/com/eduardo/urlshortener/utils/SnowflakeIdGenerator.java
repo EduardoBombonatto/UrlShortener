@@ -26,7 +26,7 @@ public class SnowflakeIdGenerator {
     private long sequence = 0L;
     private long lastTimestamp = -1L;
 
-    public SnowflakeIdGenerator(@Value("${snowflake.machine.id:1}") long machineId) {
+    public SnowflakeIdGenerator(@Value("${snowflake.machine.id}") long machineId) {
         this.machineId = machineId;
         if (this.machineId > MAX_MACHINE_ID || this.machineId < 0) {
             throw new IllegalArgumentException("Machine ID deve ser entre 0 e " + MAX_MACHINE_ID);

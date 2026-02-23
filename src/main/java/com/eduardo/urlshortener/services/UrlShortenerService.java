@@ -5,6 +5,7 @@ import com.eduardo.urlshortener.repositories.UrlRepository;
 import com.eduardo.urlshortener.utils.Base62Encoder;
 import com.eduardo.urlshortener.utils.SnowflakeIdGenerator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ public class UrlShortenerService {
         return shortUrl;
     }
 
+    @Cacheable(value = "urlCache", key = "#shortUrl")
     public String getOriginalUrl(String shortUrl) {
         UrlEntity map = urlRepository.findByShortUrl(shortUrl)
                 .orElseThrow(() -> new RuntimeException("Url not found"));
